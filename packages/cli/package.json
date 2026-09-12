@@ -1,0 +1,23 @@
+{
+  "name": "salve-push",
+  "version": "0.0.1",
+  "description": "CLI to build, sign and publish Salve Push OTA releases to a self-hosted salve-push-server",
+  "license": "Apache-2.0",
+  "bin": {
+    "salve-push": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@salve-push/protocol": "workspace:*",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
+  }
+}
