@@ -1,0 +1,12 @@
+{
+  "name": "@salve-push/e2e",
+  "private": true,
+  "description": "End-to-end tests proving CLI-signed releases verify correctly in the SDK against a real salve-push-server (docker compose). Not run by the default workspace `test` script.",
+  "scripts": {
+    "test:e2e": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}

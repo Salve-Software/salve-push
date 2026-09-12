@@ -1,0 +1,33 @@
+name: e2e
+on:
+  push:
+    paths: ["server/**", "protocol/**", "packages/protocol/**", "packages/cli/**", "packages/sdk-react-native/**"]
+  pull_request:
+    paths: ["server/**", "protocol/**", "packages/protocol/**", "packages/cli/**", "packages/sdk-react-native/**"]
+
+jobs:
+  adr-0003:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
+      - run: pnpm --filter @salve-push/protocol... --filter salve-push --filter react-native-salve-push build
+      - run: docker compose up -d --build
+      - name: wait for server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/health && exit 0
+            sleep 1
+          done
+          echo "server never became healthy" >&2
+          docker compose logs
+          exit 1
+      - run: pnpm test:e2e
+      - if: always()
+        run: docker compose down -v

@@ -26,8 +26,26 @@ func Open(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
+// migrationLockKey is an arbitrary constant identifying salve-push-server's
+// migration advisory lock, so concurrent Migrate calls (e.g. multiple
+// instances starting at once, or parallel test packages sharing a
+// database) serialize instead of racing on schema_migrations' own
+// creation.
+const migrationLockKey = 727384910
+
 func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
-	if _, err := db.ExecContext(ctx, `
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire connection: %w", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrationLockKey); err != nil {
+		return fmt.Errorf("acquire migration lock: %w", err)
+	}
+	defer conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, migrationLockKey)
+
+	if _, err := conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			name       TEXT PRIMARY KEY,
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -49,7 +67,7 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 
 	for _, name := range names {
 		var already bool
-		if err := db.QueryRowContext(ctx,
+		if err := conn.QueryRowContext(ctx,
 			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)`, name,
 		).Scan(&already); err != nil {
 			return fmt.Errorf("check migration %s: %w", name, err)
@@ -63,7 +81,7 @@ func Migrate(ctx context.Context, db *sql.DB, migrations fs.FS) error {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("begin tx for %s: %w", name, err)
 		}

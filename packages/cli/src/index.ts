@@ -26,8 +26,9 @@ const keys = program.command("keys").description("Manage the release signing key
 keys
   .command("generate")
   .description("Generate an Ed25519 signing key pair for this project")
-  .action(async () => {
-    const { publicKey, keyPath } = await generateAndWriteSigningKey(process.cwd());
+  .option("--force", "overwrite an existing signing key", false)
+  .action(async (options) => {
+    const { publicKey, keyPath } = await generateAndWriteSigningKey(process.cwd(), { force: options.force });
     console.log(`Private key written to ${keyPath} (keep it out of git, out of the server).`);
     console.log(`Public key (paste into SalvePush.configure({ signingPublicKey: ... })):`);
     console.log(publicKey);
