@@ -1,30 +1,15 @@
-// react-native-salve-push
-//
-// Public API surface follows the MVP PRD (section 16). Implementation of
-// each step (native storage, hash/signature verification, bundle swap) is
-// intentionally left for the SDK milestone — this establishes the shape
-// consumers and the CLI/server team can already build against.
+// react-native-salve-push public API (PRD §16).
+import { downloadAndVerifyBundle, fetchLatestUpdate } from "./update";
+import type { SalvePushConfig, UpdateInfo } from "./types";
 
-export interface SalvePushConfig {
-  serverUrl: string;
-  channel: string;
-  runtimeVersion: string;
-}
-
-export interface UpdateInfo {
-  id: string;
-  version: string;
-  bundleHash: string;
-  size: number;
-}
+export type { SalvePushConfig, UpdateInfo };
 
 let config: SalvePushConfig | null = null;
+let verifiedBundle: Uint8Array | null = null;
 
 function requireConfig(): SalvePushConfig {
   if (!config) {
-    throw new Error(
-      "SalvePush.configure() must be called before using the SDK"
-    );
+    throw new Error("SalvePush.configure() must be called before using the SDK");
   }
   return config;
 }
@@ -35,21 +20,21 @@ export const SalvePush = {
   },
 
   async checkForUpdate(): Promise<UpdateInfo | null> {
-    requireConfig();
-    throw new Error("not implemented");
+    return fetchLatestUpdate(requireConfig());
   },
 
-  async downloadUpdate(_update: UpdateInfo): Promise<void> {
-    requireConfig();
-    throw new Error("not implemented");
+  async downloadUpdate(update: UpdateInfo): Promise<void> {
+    verifiedBundle = await downloadAndVerifyBundle(requireConfig(), update);
   },
 
   async installUpdate(): Promise<void> {
     requireConfig();
-    throw new Error("not implemented");
+    if (!verifiedBundle) {
+      throw new Error("no downloaded update to install; call downloadUpdate() first");
+    }
+    throw new Error("not implemented: native bundle swap");
   },
 
-  /** Convenience wrapper: check → download → install in one call. */
   async sync(): Promise<void> {
     const update = await SalvePush.checkForUpdate();
     if (!update) return;
