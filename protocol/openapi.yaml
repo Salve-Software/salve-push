@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: Salve Push Protocol
+  description: >
+    Contrato HTTP entre react-native-salve-push / salve-push-cli / salve-push-platform
+    e uma instalação self-hosted do salve-push-server. Fonte única de verdade:
+    tipos Go (server/pkg/protocol) e TS (@salve-push/protocol) são gerados a partir
+    deste arquivo.
+  version: "0.1.0"
+
+servers:
+  - url: https://ota.example.com
+
+tags:
+  - name: discovery
+  - name: public
+    description: Endpoints usados pelo SDK (react-native-salve-push)
+  - name: admin
+    description: Endpoints administrativos (CLI / Platform)
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [discovery]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /.well-known/salve-push:
+    get:
+      operationId: getServerIdentity
+      tags: [discovery]
+      responses:
+        "200":
+          description: Identidade da instalação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerIdentity"
+
+  /.well-known/salve-push/challenge:
+    post:
+      operationId: postChallenge
+      tags: [discovery]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeRequest"
+      responses:
+        "200":
+          description: Resposta assinada pela chave privada da instalação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeResponse"
+
+  /v1/updates:
+    get:
+      operationId: listUpdates
+      tags: [public]
+      parameters:
+        - in: query
+          name: channel
+          schema: { type: string }
+        - in: query
+          name: platform
+          schema: { type: string, enum: [ios, android] }
+        - in: query
+          name: runtime_version
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updates disponíveis para o runtime/canal informado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReleaseMetadata"
+
+  /v1/updates/{id}:
+    get:
+      operationId: getUpdate
+      tags: [public]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Metadata de um update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseMetadata"
+
+  /v1/updates/{id}/bundle:
+    get:
+      operationId: downloadUpdateBundle
+      tags: [public]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Bundle binário do release
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+
+  /v1/releases:
+    get:
+      operationId: listReleases
+      tags: [admin]
+      responses:
+        "200":
+          description: Lista de releases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReleaseMetadata"
+    post:
+      operationId: createRelease
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateReleaseRequest"
+            encoding:
+              bundle:
+                contentType: application/octet-stream
+      responses:
+        "201":
+          description: Release criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseMetadata"
+
+  /v1/releases/{id}:
+    get:
+      operationId: getRelease
+      tags: [admin]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Release
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseMetadata"
+
+  /v1/releases/{id}/publish:
+    post:
+      operationId: publishRelease
+      tags: [admin]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Release publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseMetadata"
+
+  /v1/telemetry:
+    post:
+      operationId: postTelemetry
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelemetryEvent"
+      responses:
+        "202":
+          description: Evento aceito
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+
+    ServerIdentity:
+      type: object
+      required: [service, version, protocol_version, instance_id]
+      properties:
+        service: { type: string, enum: [salve-push] }
+        version: { type: string }
+        protocol_version: { type: integer }
+        instance_id: { type: string }
+
+    ChallengeRequest:
+      type: object
+      required: [challenge]
+      properties:
+        challenge: { type: string, description: "Nonce aleatório gerado pela Platform" }
+
+    ChallengeResponse:
+      type: object
+      required: [instance_id, signature]
+      properties:
+        instance_id: { type: string }
+        signature: { type: string }
+
+    ReleaseMetadata:
+      type: object
+      required: [id, version, platform, channel, runtime_version, bundle_hash, created_at, size]
+      properties:
+        id: { type: string }
+        version: { type: string }
+        platform: { type: string, enum: [ios, android] }
+        channel: { type: string }
+        runtime_version: { type: string }
+        bundle_hash: { type: string }
+        signature: { type: string }
+        rollout_percentage: { type: integer, minimum: 0, maximum: 100 }
+        created_at: { type: string, format: date-time }
+        size: { type: integer }
+
+    CreateReleaseRequest:
+      type: object
+      required: [version, platform, channel, runtime_version, bundle_hash, signature, bundle]
+      properties:
+        version: { type: string }
+        platform: { type: string, enum: [ios, android] }
+        channel: { type: string }
+        runtime_version: { type: string }
+        bundle_hash: { type: string, description: "SHA-256 do bundle, em hex, calculado pela CLI antes do upload" }
+        signature: { type: string }
+        rollout_percentage: { type: integer, minimum: 0, maximum: 100, default: 100 }
+        bundle: { type: string, format: binary, description: "Conteúdo binário do bundle (multipart/form-data)" }
+
+    TelemetryEvent:
+      type: object
+      required: [type, installation_id, occurred_at]
+      properties:
+        type:
+          type: string
+          enum:
+            - update_check
+            - update_download_started
+            - update_download_completed
+            - update_install
+            - update_success
+            - update_failure
+            - rollback
+        installation_id: { type: string }
+        release_id: { type: string }
+        occurred_at: { type: string, format: date-time }
