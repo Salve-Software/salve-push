@@ -29,10 +29,29 @@ describe("generateAndWriteSigningKey", () => {
     expect(publicKey).toHaveLength(44);
   });
 
-  it("generates a different key pair on every call", async () => {
+  it("generates a different key pair on every call when forced", async () => {
     const first = await generateAndWriteSigningKey(cwd);
-    const second = await generateAndWriteSigningKey(cwd);
+    const second = await generateAndWriteSigningKey(cwd, { force: true });
     expect(first.publicKey).not.toBe(second.publicKey);
+  });
+
+  it("refuses to overwrite an existing key file without force", async () => {
+    await generateAndWriteSigningKey(cwd);
+    await expect(generateAndWriteSigningKey(cwd)).rejects.toThrow(/already exists/);
+  });
+
+  it("leaves the existing private key intact when the overwrite is refused", async () => {
+    await generateAndWriteSigningKey(cwd);
+    const before = await loadSigningPrivateKey(cwd, {});
+    await expect(generateAndWriteSigningKey(cwd)).rejects.toThrow();
+    const after = await loadSigningPrivateKey(cwd, {});
+    expect(after).toBe(before);
+  });
+
+  it("overwrites the existing key file when force is true", async () => {
+    const { publicKey: firstPublicKey } = await generateAndWriteSigningKey(cwd);
+    const { publicKey: secondPublicKey } = await generateAndWriteSigningKey(cwd, { force: true });
+    expect(secondPublicKey).not.toBe(firstPublicKey);
   });
 });
 
