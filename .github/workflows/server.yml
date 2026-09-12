@@ -1,0 +1,37 @@
+name: server
+on:
+  push:
+    paths: ["server/**", "protocol/**"]
+  pull_request:
+    paths: ["server/**", "protocol/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: salve_push
+          POSTGRES_PASSWORD: salve_push
+          POSTGRES_DB: salve_push
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://salve_push:salve_push@localhost:5432/salve_push?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: server/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...

@@ -1,0 +1,40 @@
+# Local dev environment for salve-push-server: Postgres + S3-compatible
+# storage (MinIO), matching the infra a self-hosting user would run
+# themselves (PRD sections 24-25). Used by examples/react-native-demo
+# and by `make run` in server/.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: salve_push
+      POSTGRES_PASSWORD: salve_push
+      POSTGRES_DB: salve_push
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: salve_push
+      MINIO_ROOT_PASSWORD: salve_push_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes: [miniodata:/data]
+
+  server:
+    build: ./server
+    depends_on: [postgres, minio]
+    environment:
+      ADDR: ":8080"
+      DATABASE_URL: postgres://salve_push:salve_push@postgres:5432/salve_push?sslmode=disable
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_BUCKET: salve-push
+      STORAGE_ACCESS_KEY: salve_push
+      STORAGE_SECRET_KEY: salve_push_secret
+    ports: ["8080:8080"]
+
+volumes:
+  pgdata:
+  miniodata:
