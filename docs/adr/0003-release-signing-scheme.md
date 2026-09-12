@@ -68,7 +68,48 @@ qualquer comando de release), imprime a chave pública para o desenvolvedor
 colar no `configure()`, e guarda a privada localmente / em secret de CI —
 nunca no request para o server.
 
-### 3. Codificação no protocolo
+### 3. Mensagem assinada: hash + metadata canonicalizado, não só os bytes do bundle
+
+Assinar apenas o hash (ou apenas os bytes) do bundle prova "estes bytes
+vieram de mim", mas não prova "estes bytes são a versão 1.5.0 do canal
+production". Um `salve-push-server` self-hosted comprometido poderia
+republicar um bundle legitimamente assinado sob outro `version`,
+`channel` ou `rollout_percentage` — mesma assinatura, metadata trocado.
+
+A mensagem assinada é uma string canônica que amarra o hash ao restante
+do metadata do release:
+
+```
+message = bundle_hash + "\n" + version + "\n" + platform + "\n" + channel + "\n" + runtime_version
+signature = Ed25519_Sign(privateKey, utf8(message))
+```
+
+Qualquer alteração de metadata pós-assinatura invalida a verificação no
+SDK, não só alteração dos bytes do bundle. Essa construção (e a
+verificação correspondente) vive em `@salve-push/protocol` — mesmo pacote
+que já é fonte única do contrato de wire (ADR 0002) — para que CLI (assina)
+e SDK (verifica) nunca possam divergir na forma de montar a mensagem.
+
+### 4. Biblioteca: `@noble/ed25519` nos dois lados
+
+CLI (Node) e SDK (Hermes/React Native) usam a mesma lib, pura JS, sem
+binding nativo: gera chaves e assinaturas como bytes brutos (`Uint8Array`),
+sem PEM/DER. Usar `node:crypto` na CLI geraria chaves em PKCS8/DER que
+precisariam de conversão para casar com o que o SDK consegue verificar em
+Hermes — complexidade sem benefício.
+
+### 5. Armazenamento da chave privada na CLI
+
+`salve-push keys generate` escreve a chave privada em `.salve-push/signing.key`
+(gitignored) e imprime a chave pública em base64 para colar no
+`configure()` do app. `salve-push release` lê a chave de
+`.salve-push/signing.key` por padrão, ou de `SALVE_PUSH_SIGNING_KEY`
+(env var) quando definida — cobre CI/CD sem exigir o arquivo no repositório
+(PRD exige a CLI funcionar em CI/CD). Isso é ortogonal a quem hospeda o
+`salve-push-server`: a chave nunca é enviada a ele, seja instalação de
+referência ou fork de terceiro.
+
+### 6. Codificação no protocolo
 
 - `bundle_hash`: continua **hex** (já implementado — SHA-256 em hex é a
   convenção universal, mesma usada por `git`, checksums de download, etc.
@@ -77,10 +118,11 @@ nunca no request para o server.
   caracteres em base64 contra 128 em hex — e é o padrão de fato para
   assinaturas binárias em APIs JSON, usado por sigstore/minisign/JWS).
 
-`openapi.yaml` ganha `format: byte` (base64, semântica OpenAPI padrão)
-no campo `signature`, e o SDK/CLI usam uma lib Ed25519 comum para
-assinar/verificar sobre os bytes brutos do bundle (o mesmo conteúdo cujo
-SHA-256 vira `bundle_hash`).
+`signature` continua `type: string` no OpenAPI (não `format: byte`): esse
+format faz o oapi-codegen gerar `[]byte` em Go, que o `encoding/json`
+volta a base64-codificar sozinho na serialização — duplo encode em cima do
+valor que já guardamos como texto base64. Mantemos `string` simples com a
+convenção documentada na `description`.
 
 ## Consequências
 - CLI ganha um comando novo (`salve-push keys generate`) e passa a exigir
@@ -115,3 +157,8 @@ SHA-256 vira `bundle_hash`).
   app autoriza" (assinatura de release, verificada pelo SDK no device).
   Um server comprometido não deveria conseguir se auto-certificar como
   fonte confiável de código. Descartado.
+- **Assinar só o hash ou só os bytes do bundle, sem metadata**: mais simples
+  de implementar, mas permite que um server comprometido republique um
+  bundle validamente assinado sob outra versão/canal/rollout, já que a
+  assinatura nunca amarrou a esses campos. Descartado em favor da mensagem
+  canônica hash+metadata.

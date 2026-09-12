@@ -240,7 +240,7 @@ components:
         channel: { type: string }
         runtime_version: { type: string }
         bundle_hash: { type: string }
-        signature: { type: string }
+        signature: { type: string, description: "Assinatura Ed25519, codificada em base64 de bundle_hash+version+platform+channel+runtime_version" }
         rollout_percentage: { type: integer, minimum: 0, maximum: 100 }
         created_at: { type: string, format: date-time }
         size: { type: integer }
@@ -254,7 +254,7 @@ components:
         channel: { type: string }
         runtime_version: { type: string }
         bundle_hash: { type: string, description: "SHA-256 do bundle, em hex, calculado pela CLI antes do upload" }
-        signature: { type: string }
+        signature: { type: string, description: "Assinatura Ed25519, codificada em base64 de bundle_hash+version+platform+channel+runtime_version" }
         rollout_percentage: { type: integer, minimum: 0, maximum: 100, default: 100 }
         bundle: { type: string, format: binary, description: "Conteúdo binário do bundle (multipart/form-data)" }
 
