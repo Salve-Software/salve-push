@@ -82,11 +82,14 @@ func (h *releasesHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *releasesHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	rel, err := h.service.Get(r.Context(), r.PathValue("id"))
-	if errors.Is(err, releases.ErrNotFound) {
+	switch {
+	case errors.Is(err, releases.ErrInvalidID):
+		http.Error(w, "invalid release id", http.StatusBadRequest)
+		return
+	case errors.Is(err, releases.ErrNotFound):
 		http.Error(w, "release not found", http.StatusNotFound)
 		return
-	}
-	if err != nil {
+	case err != nil:
 		http.Error(w, "failed to get release", http.StatusInternalServerError)
 		return
 	}
@@ -95,11 +98,14 @@ func (h *releasesHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 
 func (h *releasesHandler) handlePublish(w http.ResponseWriter, r *http.Request) {
 	rel, err := h.service.Publish(r.Context(), r.PathValue("id"))
-	if errors.Is(err, releases.ErrNotFound) {
+	switch {
+	case errors.Is(err, releases.ErrInvalidID):
+		http.Error(w, "invalid release id", http.StatusBadRequest)
+		return
+	case errors.Is(err, releases.ErrNotFound):
 		http.Error(w, "release not found", http.StatusNotFound)
 		return
-	}
-	if err != nil {
+	case err != nil:
 		http.Error(w, "failed to publish release", http.StatusInternalServerError)
 		return
 	}

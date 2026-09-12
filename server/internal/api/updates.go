@@ -38,11 +38,14 @@ func (h *updatesHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *updatesHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	rel, err := h.service.Get(r.Context(), r.PathValue("id"))
-	if errors.Is(err, releases.ErrNotFound) {
+	switch {
+	case errors.Is(err, releases.ErrInvalidID):
+		http.Error(w, "invalid update id", http.StatusBadRequest)
+		return
+	case errors.Is(err, releases.ErrNotFound):
 		http.Error(w, "update not found", http.StatusNotFound)
 		return
-	}
-	if err != nil {
+	case err != nil:
 		http.Error(w, "failed to get update", http.StatusInternalServerError)
 		return
 	}
@@ -51,11 +54,14 @@ func (h *updatesHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 
 func (h *updatesHandler) handleBundle(w http.ResponseWriter, r *http.Request) {
 	body, rel, err := h.service.OpenBundle(r.Context(), r.PathValue("id"))
-	if errors.Is(err, releases.ErrNotFound) {
+	switch {
+	case errors.Is(err, releases.ErrInvalidID):
+		http.Error(w, "invalid update id", http.StatusBadRequest)
+		return
+	case errors.Is(err, releases.ErrNotFound):
 		http.Error(w, "update not found", http.StatusNotFound)
 		return
-	}
-	if err != nil {
+	case err != nil:
 		http.Error(w, "failed to open bundle", http.StatusInternalServerError)
 		return
 	}

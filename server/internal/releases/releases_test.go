@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/salvesoftware/salve-push/server/internal/database"
@@ -106,6 +107,25 @@ func TestGet_UnknownIDReturnsErrNotFound(t *testing.T) {
 	_, err := svc.Get(context.Background(), "00000000-0000-0000-0000-000000000000")
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Get on unknown id = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGet_MalformedIDReturnsErrInvalidID(t *testing.T) {
+	svc := testService(t)
+	cases := []string{"not-a-uuid", "' OR '1'='1", strings.Repeat("a", 5000), ""}
+	for _, id := range cases {
+		_, err := svc.Get(context.Background(), id)
+		if !errors.Is(err, ErrInvalidID) {
+			t.Fatalf("Get(%q) = %v, want ErrInvalidID", id, err)
+		}
+	}
+}
+
+func TestPublish_MalformedIDReturnsErrInvalidID(t *testing.T) {
+	svc := testService(t)
+	_, err := svc.Publish(context.Background(), "not-a-uuid")
+	if !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("Publish(malformed) = %v, want ErrInvalidID", err)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 
 var ErrHashMismatch = errors.New("bundle hash mismatch")
 var ErrNotFound = errors.New("release not found")
+var ErrInvalidID = errors.New("invalid release id")
 
 type Release struct {
 	ID                string
@@ -108,6 +109,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Release, error) 
 }
 
 func (s *Service) Publish(ctx context.Context, id string) (*Release, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, ErrInvalidID
+	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE releases SET published_at = now() WHERE id = $1 AND published_at IS NULL`,
 		id,
@@ -133,6 +137,9 @@ func (s *Service) List(ctx context.Context) ([]*Release, error) {
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*Release, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, ErrInvalidID
+	}
 	row := s.db.QueryRowContext(ctx, selectColumns+` FROM releases WHERE id = $1`, id)
 	rel, err := scanRelease(row)
 	if errors.Is(err, sql.ErrNoRows) {
