@@ -1,0 +1,22 @@
+{
+  "name": "react-native-salve-push",
+  "version": "0.0.1",
+  "description": "React Native SDK for Salve Push — check, download, verify and install OTA updates from a self-hosted salve-push-server",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.73.0"
+  },
+  "dependencies": {
+    "@salve-push/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
