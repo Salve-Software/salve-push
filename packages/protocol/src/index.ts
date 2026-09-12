@@ -15,3 +15,5 @@ export type CreateReleaseRequest =
   components["schemas"]["CreateReleaseRequest"];
 export type TelemetryEvent = components["schemas"]["TelemetryEvent"];
 export type ServerIdentity = components["schemas"]["ServerIdentity"];
+
+export * from "./signing";
