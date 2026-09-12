@@ -1,7 +1,7 @@
 # Local dev environment for salve-push-server: Postgres + S3-compatible
 # storage (MinIO), matching the infra a self-hosting user would run
-# themselves (PRD sections 24-25). Used by examples/react-native-demo
-# and by `make run` in server/.
+# themselves (PRD sections 24-25). Used by examples/react-native-demo,
+# server/test/api integration tests, and `make run` in server/.
 services:
   postgres:
     image: postgres:16-alpine
@@ -11,9 +11,14 @@ services:
       POSTGRES_DB: salve_push
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salve_push"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: salve_push
@@ -22,10 +27,30 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes: [miniodata:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  createbuckets:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 salve_push salve_push_secret &&
+        mc mb -p local/salve-push
+      "
 
   server:
     build: ./server
-    depends_on: [postgres, minio]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
     environment:
       ADDR: ":8080"
       DATABASE_URL: postgres://salve_push:salve_push@postgres:5432/salve_push?sslmode=disable
