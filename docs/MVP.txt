@@ -1,0 +1,1263 @@
+# Salve Push — PRD / MVP
+
+## 1. Visão do produto
+
+**Salve Push** é uma plataforma de atualizações OTA (Over-The-Air) para aplicações React Native.
+
+O diferencial central é a separação entre:
+
+* **Control Plane:** hospedado e operado pela Salve Software.
+* **Data Plane:** hospedado pelo próprio cliente.
+
+O cliente utiliza a interface web da Salve para gerenciar projetos, releases, canais e rollouts, mas a infraestrutura responsável por armazenar e distribuir os bundles permanece sob controle do cliente.
+
+### Proposta de valor
+
+> **OTA para React Native. Sua infraestrutura, nosso painel.**
+
+O objetivo é oferecer uma experiência semelhante a plataformas como Expo Updates/serviços OTA tradicionais, mas permitindo que empresas mantenham sua própria infraestrutura.
+
+---
+
+# 2. Produtos e componentes
+
+O ecossistema inicial será dividido em quatro componentes.
+
+## 2.1 `salve-push-server`
+
+Servidor open source responsável pelo armazenamento, gerenciamento e distribuição dos releases OTA.
+
+**Tecnologia principal:**
+
+* Go
+* HTTP/REST
+* PostgreSQL
+* S3-compatible storage
+
+O servidor será disponibilizado publicamente no GitHub.
+
+Nome sugerido do repositório:
+
+```text
+salvesoftware/salve-push-server
+```
+
+O nome comercial poderá ser simplesmente:
+
+```text
+Salve Push Server
+```
+
+ou apenas:
+
+```text
+Salve Push
+```
+
+---
+
+## 2.2 `react-native-salve-push`
+
+SDK React Native responsável por:
+
+* verificar atualizações;
+* baixar bundles;
+* validar integridade;
+* validar assinatura;
+* armazenar updates;
+* aplicar updates;
+* realizar rollback básico;
+* comunicar-se com o `salve-push-server`.
+
+Nome do pacote:
+
+```text
+react-native-salve-push
+```
+
+---
+
+## 2.3 `salve-push-cli`
+
+CLI responsável principalmente pela criação e publicação de releases.
+
+Exemplo:
+
+```bash
+npx salve-push release
+```
+
+Responsabilidades:
+
+* detectar/configurar projeto;
+* gerar bundle;
+* coletar metadata;
+* gerar hash;
+* assinar release;
+* enviar release para o servidor;
+* consultar status da publicação.
+
+A CLI deverá ser compatível com CI/CD.
+
+---
+
+## 2.4 `salve-push-platform`
+
+Aplicação web SaaS utilizada para gerenciar os projetos.
+
+Responsabilidades:
+
+* autenticação;
+* projetos;
+* deployments;
+* configuração do servidor;
+* releases;
+* canais;
+* rollout;
+* histórico;
+* status da infraestrutura.
+
+O Platform **não precisa hospedar os bundles dos clientes**.
+
+---
+
+# 3. Arquitetura conceitual
+
+A arquitetura deve separar claramente o Control Plane do Data Plane.
+
+```text
+                         SALVE PUSH PLATFORM
+                         ┌───────────────────┐
+                         │                   │
+                         │ Projects          │
+                         │ Deployments       │
+                         │ Releases          │
+                         │ Rollouts          │
+                         │ Monitoring        │
+                         │                   │
+                         └─────────┬─────────┘
+                                   │
+                              Control API
+                                   │
+                                   ▼
+                         ┌───────────────────┐
+                         │ Salve Cloud       │
+                         │                   │
+                         │ Metadata          │
+                         │ Authentication    │
+                         │ Deployment state  │
+                         └─────────┬─────────┘
+                                   │
+                              HTTPS
+                                   │
+                ┌──────────────────▼──────────────────┐
+                │                                     │
+                │       CLIENT INFRASTRUCTURE         │
+                │                                     │
+                │       salve-push-server              │
+                │              │                      │
+                │       ┌──────┴──────┐               │
+                │       │             │               │
+                │   PostgreSQL    S3 Storage           │
+                │                                     │
+                └──────────────────┬──────────────────┘
+                                   │
+                              HTTPS
+                                   │
+                                   ▼
+                         React Native Application
+                                   │
+                                   ▼
+                     react-native-salve-push
+```
+
+---
+
+# 4. Princípio fundamental
+
+O Salve Push Platform deve armazenar apenas o **metadata necessário para operar a plataforma**.
+
+Idealmente:
+
+```text
+Salve Cloud
+├── Project
+├── Deployment
+├── Release metadata
+├── Channel
+├── Rollout
+├── Server identity
+└── Authentication
+```
+
+Enquanto:
+
+```text
+Cliente
+├── OTA bundles
+├── Bundle signatures
+├── Bundle storage
+└── OTA server database
+```
+
+ficam na infraestrutura do cliente.
+
+Isso permite que o produto tenha uma proposta forte de privacidade:
+
+> O código da sua aplicação permanece na sua infraestrutura.
+
+---
+
+# 5. MVP — objetivo
+
+O MVP precisa provar o seguinte fluxo:
+
+> Um desenvolvedor consegue criar um projeto, conectar um `salve-push-server` hospedado em sua própria infraestrutura, publicar uma nova versão React Native e fazer um aplicativo receber e instalar essa versão OTA.
+
+Todo o restante é secundário.
+
+---
+
+# 6. Fluxo principal
+
+## 6.1 Criar projeto
+
+Usuário entra no Platform:
+
+```text
+Create project
+```
+
+Exemplo:
+
+```text
+My App
+```
+
+O Platform gera:
+
+```text
+Project ID
+Project credentials
+Signing configuration
+```
+
+---
+
+# 7. Conectar infraestrutura
+
+O usuário instala o servidor:
+
+```bash
+git clone https://github.com/salvesoftware/salve-push-server
+```
+
+ou:
+
+```bash
+docker pull salvesoftware/salve-push-server
+```
+
+Configura:
+
+```env
+DATABASE_URL=postgres://...
+STORAGE_ENDPOINT=https://...
+STORAGE_BUCKET=salve-push
+STORAGE_ACCESS_KEY=...
+STORAGE_SECRET_KEY=...
+```
+
+Executa:
+
+```bash
+salve-push-server
+```
+
+O servidor expõe:
+
+```text
+https://ota.example.com
+```
+
+O usuário adiciona essa URL no Platform.
+
+```text
+Add deployment
+
+Name:
+Production
+
+Server URL:
+https://ota.example.com
+```
+
+---
+
+# 8. Verificação do servidor
+
+O Platform deve verificar se a URL realmente corresponde a uma instalação legítima do Salve Push Server.
+
+Endpoint:
+
+```http
+GET /.well-known/salve-push
+```
+
+Resposta:
+
+```json
+{
+  "service": "salve-push",
+  "version": "0.1.0",
+  "protocol_version": 1,
+  "instance_id": "..."
+}
+```
+
+Porém, somente esse endpoint não deve ser considerado suficiente para autenticação.
+
+---
+
+# 9. Server Identity
+
+Cada instalação do `salve-push-server` deve possuir uma identidade criptográfica.
+
+Na primeira inicialização:
+
+```text
+private key
+public key
+instance ID
+```
+
+A chave privada permanece exclusivamente na infraestrutura do cliente.
+
+A public key pode ser registrada no Platform.
+
+---
+
+# 10. Challenge/Response
+
+O Platform poderá verificar uma instalação através de challenge/response.
+
+Exemplo:
+
+```http
+POST /.well-known/salve-push/challenge
+```
+
+Platform:
+
+```json
+{
+  "challenge": "random_nonce"
+}
+```
+
+Server:
+
+```json
+{
+  "instance_id": "...",
+  "signature": "..."
+}
+```
+
+O Platform valida a assinatura utilizando a public key registrada.
+
+Objetivo:
+
+```text
+URL correta
++
+software legítimo
++
+identidade criptográfica
+=
+deployment verificado
+```
+
+---
+
+# 11. Releases
+
+Um release representa uma versão OTA distribuível.
+
+Metadata mínima:
+
+```json
+{
+  "id": "...",
+  "version": "1.5.0",
+  "platform": "ios",
+  "channel": "production",
+  "runtime_version": "1.5",
+  "bundle_hash": "...",
+  "created_at": "...",
+  "size": 1839201
+}
+```
+
+---
+
+# 12. Channels
+
+O MVP terá channels.
+
+Inicialmente:
+
+```text
+production
+staging
+development
+```
+
+O usuário poderá criar outros posteriormente.
+
+Exemplo:
+
+```text
+App Build
+   │
+   ├── development
+   ├── staging
+   └── production
+```
+
+O SDK deverá informar o channel configurado.
+
+---
+
+# 13. Runtime Version
+
+O sistema precisa impedir que um bundle incompatível seja instalado em uma versão incompatível do aplicativo.
+
+Exemplo:
+
+```text
+Native Runtime
+1.5
+```
+
+Só releases compatíveis com:
+
+```text
+runtime_version = 1.5
+```
+
+podem ser oferecidos.
+
+Isso é importante porque OTA **não pode substituir alterações nativas incompatíveis**.
+
+---
+
+# 14. Bundle
+
+O release poderá conter:
+
+```text
+bundle
+assets
+metadata
+signature
+hash
+```
+
+Estrutura conceitual:
+
+```text
+release/
+├── metadata.json
+├── bundle.js
+├── assets/
+│   ├── ...
+│   └── ...
+└── signature
+```
+
+O formato físico pode ser otimizado posteriormente.
+
+---
+
+# 15. Segurança
+
+Segurança deve fazer parte do MVP desde o início.
+
+## 15.1 Hash
+
+Cada bundle terá um hash criptográfico.
+
+Exemplo:
+
+```text
+SHA-256
+```
+
+O SDK verifica o hash após o download.
+
+---
+
+## 15.2 Assinatura
+
+Cada release deve ser assinado.
+
+Fluxo:
+
+```text
+Developer
+    │
+    ▼
+CLI
+    │
+    ├── bundle
+    ├── hash
+    └── signature
+            │
+            ▼
+     salve-push-server
+            │
+            ▼
+       React Native
+            │
+            ▼
+     verify signature
+            │
+            ▼
+          install
+```
+
+A chave privada de assinatura **nunca deve ficar no `salve-push-server`**.
+
+---
+
+# 16. SDK
+
+Pacote:
+
+```text
+react-native-salve-push
+```
+
+Configuração inicial:
+
+```ts
+import SalvePush from 'react-native-salve-push';
+
+SalvePush.configure({
+  serverUrl: 'https://ota.example.com',
+  channel: 'production',
+  runtimeVersion: '1.5'
+});
+```
+
+API inicial:
+
+```ts
+await SalvePush.checkForUpdate();
+
+await SalvePush.downloadUpdate();
+
+await SalvePush.installUpdate();
+```
+
+Também pode existir uma API simplificada:
+
+```ts
+await SalvePush.sync();
+```
+
+---
+
+# 17. Fluxo do SDK
+
+Ao iniciar:
+
+```text
+App launch
+    │
+    ▼
+Check local update
+    │
+    ├── update pending?
+    │
+    └── continue
+          │
+          ▼
+   Check server
+          │
+          ▼
+   Update available?
+       │       │
+      no      yes
+       │       │
+       ▼       ▼
+     done    download
+                 │
+                 ▼
+              verify
+                 │
+                 ▼
+              install
+                 │
+                 ▼
+          next app launch
+```
+
+---
+
+# 18. Rollback
+
+O SDK deverá manter informação sobre a última versão considerada estável.
+
+Exemplo:
+
+```text
+Current
+1.5.0
+
+Previous
+1.4.2
+```
+
+Se a aplicação detectar que o update falhou repetidamente durante o startup, poderá voltar para a versão anterior.
+
+No MVP:
+
+* rollback local básico;
+* limite de tentativas;
+* fallback para bundle anterior.
+
+Rollback remoto automatizado pode ser adicionado posteriormente.
+
+---
+
+# 19. Rollout
+
+O MVP terá rollout percentual.
+
+Exemplo:
+
+```text
+Release 1.5.0
+
+Rollout: 10%
+```
+
+O SDK utiliza um identificador persistente da instalação para determinar o grupo.
+
+Exemplo:
+
+```text
+installation_id
+       ↓
+      hash
+       ↓
+   bucket 0-99
+```
+
+Assim o usuário permanece no mesmo grupo.
+
+---
+
+# 20. Dashboard
+
+O Platform terá inicialmente quatro áreas principais.
+
+## Projects
+
+```text
+Projects
+
+My App
+Production
+● Healthy
+
+Latest: 1.5.0
+Rollout: 30%
+```
+
+## Deployment
+
+```text
+Production
+
+Server
+https://ota.example.com
+
+Status
+● Connected
+
+Server Version
+0.1.0
+```
+
+## Releases
+
+```text
+Releases
+
+1.5.0
+Production
+30%
+iOS / Android
+
+1.4.2
+Production
+100%
+iOS / Android
+```
+
+## Create Release
+
+```text
+Create Release
+
+Version
+[ 1.5.0 ]
+
+Runtime Version
+[ 1.5 ]
+
+Channel
+[ production ]
+
+Platform
+☑ iOS
+☑ Android
+
+Rollout
+[ 10% ]
+
+[ Publish ]
+```
+
+---
+
+# 21. CLI
+
+Nome:
+
+```text
+salve-push
+```
+
+Comandos iniciais:
+
+```bash
+salve-push login
+salve-push init
+salve-push release
+salve-push releases
+```
+
+Exemplo:
+
+```bash
+salve-push release \
+  --version 1.5.0 \
+  --channel production
+```
+
+A CLI deverá funcionar em ambientes CI/CD.
+
+---
+
+# 22. API do Server
+
+A API do `salve-push-server` deverá ser RESTful.
+
+Endpoints iniciais:
+
+```text
+GET  /health
+
+GET  /.well-known/salve-push
+POST /.well-known/salve-push/challenge
+
+GET  /v1/updates
+GET  /v1/updates/:id
+GET  /v1/updates/:id/bundle
+
+POST /v1/releases
+POST /v1/releases/:id/publish
+
+GET  /v1/releases
+GET  /v1/releases/:id
+
+POST /v1/telemetry
+```
+
+Os endpoints públicos utilizados pelo SDK devem ser separados conceitualmente dos endpoints administrativos.
+
+---
+
+# 23. Go Server
+
+O `salve-push-server` deverá ser desenvolvido em Go.
+
+Estrutura sugerida:
+
+```text
+salve-push-server/
+
+cmd/
+  server/
+    main.go
+
+internal/
+  api/
+  auth/
+  config/
+  crypto/
+  database/
+  releases/
+  storage/
+  updates/
+  telemetry/
+
+pkg/
+  protocol/
+
+migrations/
+
+Dockerfile
+docker-compose.yml
+
+go.mod
+go.sum
+```
+
+Princípios:
+
+* Go idiomático;
+* dependências mínimas;
+* configuração via environment variables;
+* suporte a PostgreSQL;
+* storage abstraído;
+* testes unitários;
+* testes de integração;
+* Docker oficial;
+* health checks;
+* logs estruturados.
+
+---
+
+# 24. Storage
+
+O servidor não deve assumir armazenamento local como solução definitiva.
+
+Criar uma interface:
+
+```go
+type Storage interface {
+    Put(...)
+    Get(...)
+    Delete(...)
+    Exists(...)
+}
+```
+
+Implementações iniciais:
+
+```text
+S3
+Local filesystem
+```
+
+S3 deve ser o caminho recomendado para produção.
+
+Isso permite:
+
+```text
+AWS S3
+Cloudflare R2
+MinIO
+DigitalOcean Spaces
+Backblaze
+```
+
+desde que sejam compatíveis com S3.
+
+---
+
+# 25. Database
+
+PostgreSQL será o banco recomendado.
+
+Entidades principais:
+
+```text
+Project
+Deployment
+Release
+Channel
+Bundle
+Installation
+```
+
+O servidor self-hosted deve possuir seu próprio banco.
+
+O Platform possui banco separado.
+
+Não compartilhar o banco entre Cloud e Server.
+
+---
+
+# 26. API Authentication
+
+A comunicação entre:
+
+```text
+SDK → Server
+```
+
+utiliza credenciais específicas do projeto/deployment.
+
+A comunicação:
+
+```text
+Platform → Server
+```
+
+utiliza credenciais administrativas próprias.
+
+Esses dois tipos de acesso devem ser separados.
+
+O SDK **nunca deve possuir uma credencial com privilégios administrativos**.
+
+---
+
+# 27. Observabilidade
+
+MVP:
+
+```text
+GET /health
+```
+
+Deve retornar:
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0"
+}
+```
+
+Também devem existir:
+
+* logs estruturados;
+* request ID;
+* métricas básicas;
+* readiness/liveness endpoints.
+
+Não construir um sistema completo de observabilidade próprio.
+
+---
+
+# 28. Telemetria
+
+O SDK poderá enviar eventos mínimos:
+
+```text
+update_check
+update_download_started
+update_download_completed
+update_install
+update_success
+update_failure
+rollback
+```
+
+Mas a telemetria deve ser **opcional**.
+
+Por padrão, o cliente deve ter controle sobre onde esses dados são enviados.
+
+---
+
+# 29. Open Source
+
+O projeto:
+
+```text
+salve-push-server
+```
+
+será open source.
+
+Licença recomendada para o MVP:
+
+```text
+Apache 2.0
+```
+
+ou:
+
+```text
+MIT
+```
+
+O código deverá permitir que o usuário:
+
+* faça fork;
+* hospede;
+* modifique;
+* execute em sua própria infraestrutura.
+
+O Platform será o produto SaaS.
+
+---
+
+# 30. Monetização
+
+O modelo inicial:
+
+```text
+Open Source
+        +
+Managed Platform
+```
+
+O usuário pode:
+
+### Self-host tudo
+
+```text
+Server próprio
++
+Platform próprio/fork
+```
+
+ou:
+
+### Usar Salve Platform
+
+```text
+Server próprio
++
+Salve Push Platform
+```
+
+A segunda opção é a experiência recomendada.
+
+A monetização pode ser baseada em:
+
+* quantidade de projetos;
+* quantidade de deployments;
+* usuários/equipe;
+* releases;
+* dispositivos ativos;
+* funcionalidades avançadas.
+
+Não é necessário definir pricing no MVP.
+
+---
+
+# 31. Fora do escopo do MVP
+
+Não implementar inicialmente:
+
+* builds iOS/Android;
+* signing de aplicações nativas;
+* App Store deployment;
+* Google Play deployment;
+* crash reporting;
+* A/B testing;
+* feature flags;
+* advanced analytics;
+* complex user segmentation;
+* staged rollout baseado em país;
+* automatic rollback baseado em métricas;
+* GitHub integration avançada;
+* Slack/Discord notifications;
+* Kubernetes operator;
+* Terraform provider;
+* Helm chart;
+* multi-region;
+* edge CDN próprio.
+
+---
+
+# 32. Critérios de sucesso do MVP
+
+O MVP será considerado funcional quando for possível executar o seguinte cenário:
+
+### 1.
+
+Criar um projeto no:
+
+```text
+salve-push-platform
+```
+
+### 2.
+
+Instalar:
+
+```text
+salve-push-server
+```
+
+em uma infraestrutura externa.
+
+### 3.
+
+Registrar essa infraestrutura no Platform.
+
+### 4.
+
+O Platform validar a identidade do servidor.
+
+### 5.
+
+Configurar:
+
+```text
+react-native-salve-push
+```
+
+em um aplicativo.
+
+### 6.
+
+Publicar uma release usando:
+
+```bash
+salve-push release
+```
+
+### 7.
+
+O bundle ser armazenado na infraestrutura do cliente.
+
+### 8.
+
+O aplicativo detectar a nova versão.
+
+### 9.
+
+O SDK baixar o bundle.
+
+### 10.
+
+O SDK validar:
+
+```text
+hash
++
+signature
++
+runtime compatibility
+```
+
+### 11.
+
+O aplicativo instalar o update.
+
+### 12.
+
+O Platform mostrar:
+
+```text
+Release 1.5.0
+30% rollout
+Healthy
+```
+
+---
+
+# 33. Primeiro milestone
+
+O primeiro milestone não deve começar pelo dashboard.
+
+Começar pelo caminho crítico:
+
+```text
+React Native
+      ↓
+react-native-salve-push
+      ↓
+salve-push-server
+      ↓
+PostgreSQL + S3
+```
+
+Criar primeiro:
+
+1. Server;
+2. protocolo OTA;
+3. SDK;
+4. assinatura;
+5. CLI;
+6. fluxo completo local.
+
+Somente depois:
+
+```text
+Salve Push Platform
+```
+
+Isso reduz drasticamente o risco do projeto.
+
+---
+
+# 34. Definition of Done
+
+O MVP técnico estará pronto quando existir um exemplo público:
+
+```text
+examples/react-native-demo
+```
+
+com:
+
+```text
+React Native App
+        ↓
+react-native-salve-push
+        ↓
+localhost / Docker
+        ↓
+salve-push-server
+        ↓
+release
+        ↓
+OTA update
+```
+
+Um desenvolvedor deverá conseguir clonar o projeto e executar todo o fluxo localmente.
+
+Exemplo:
+
+```bash
+git clone ...
+docker compose up
+npm install
+npx salve-push init
+npx salve-push release
+```
+
+e observar uma atualização OTA funcionando no aplicativo.
+
+---
+
+# 35. Princípio de desenvolvimento
+
+O Salve Push deve priorizar:
+
+**Simple > Feature-rich**
+
+**Self-hosted > Vendor lock-in**
+
+**Secure by default > Convenience**
+
+**Open protocol > Closed implementation**
+
+**Developer experience > Enterprise complexity**
+
+O objetivo do MVP não é construir a plataforma OTA mais completa.
+
+É construir a plataforma OTA mais simples de adotar para quem quer:
+
+> **React Native OTA sem abrir mão da própria infraestrutura.**
