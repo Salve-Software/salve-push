@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+*.log
+
+
+# generated protocol types (run `pnpm protocol:generate`)
+packages/protocol/src/generated.ts
+server/pkg/protocol/types.gen.go
+# go
+server/bin/
+server/*.env
+server/tmp/
+
+# node
+.pnpm-store/
+.turbo/
+
+# env
+.env
+.env.local
+
+# os
+.DS_Store
