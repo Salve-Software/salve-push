@@ -1,0 +1,15 @@
+{
+  "name": "salve-push-playground",
+  "private": true,
+  "description": "Throwaway local UI to exercise a running salve-push-server while the real Platform doesn't exist yet. Not a product.",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@salve-push/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "typescript": "^5.5.0"
+  }
+}
