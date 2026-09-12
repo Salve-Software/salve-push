@@ -16,6 +16,7 @@ jobs:
           node-version: "20"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
       - run: pnpm --filter @salve-push/protocol... --filter salve-push --filter react-native-salve-push build
       - run: docker compose up -d --build
       - name: wait for server
