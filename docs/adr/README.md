@@ -42,3 +42,4 @@ O que foi descartado e por quê.
 
 - [0001 — Topologia de repositórios e pacotes](0001-repository-and-package-topology.md)
 - [0002 — OpenAPI como fonte única do protocolo](0002-openapi-as-protocol-source-of-truth.md)
+- [0003 — Esquema de assinatura de releases](0003-release-signing-scheme.md)

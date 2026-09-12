@@ -13,9 +13,11 @@ Applies to `server/` (Go) and `packages/*` (TypeScript) in this repo.
   shape once there are 2+ cases for the same function.
 - A bug fix always starts with a regression test that reproduces the bug
   and fails before the fix.
-- No PR/commit adds a new package, service method, or HTTP handler without
-  a corresponding `_test.go` (Go) or `*.test.ts` (TS) landing in the same
-  change.
+- No PR/commit adds a new package or service method without a
+  corresponding `_test.go` (Go) or `*.test.ts` (TS) landing in the same
+  change. New or changed HTTP routes follow `api-integration-testing.md`
+  instead — real black-box tests against the running stack, not unit
+  tests of the handler function.
 - Integration tests that need real infrastructure (Postgres, S3) MUST be
   gated behind an environment variable (e.g. `TEST_DATABASE_URL`) and
   `t.Skip()` cleanly when it's unset, so `go test ./...` stays runnable
