@@ -15,8 +15,11 @@ class HybridSalvePushNative : HybridSalvePushNativeSpec() {
       ?: throw Error("No ApplicationContext set!")
 
   override fun installUpdate(releaseId: String, bundle: ArrayBuffer): Promise<Unit> {
+    // ArrayBuffer is bridge-backed and only safe to touch synchronously, on this call - copy it to
+    // a plain ByteArray before crossing onto the background queue (see ADR 0004 postmortem).
+    val bytes = bundle.toByteArray()
     return Promise.parallel {
-      SalvePushStorage.installUpdate(context, releaseId, bundle.toByteArray())
+      SalvePushStorage.installUpdate(context, releaseId, bytes)
     }
   }
 
