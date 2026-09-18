@@ -48,6 +48,11 @@ export const SalvePush = {
     await salvePushNative.notifyAppReady();
   },
 
+  /** Returns the release id of the bundle currently active on disk, or "" if none was ever installed. */
+  async getCurrentReleaseId(): Promise<string> {
+    return salvePushNative.getCurrentReleaseId();
+  },
+
   /** Convenience wrapper: check → download → install in one call. */
   async sync(): Promise<void> {
     const update = await SalvePush.checkForUpdate();
