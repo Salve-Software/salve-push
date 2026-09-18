@@ -19,7 +19,8 @@ import {
 import SalvePush, { type UpdateInfo } from 'react-native-salve-push';
 
 SalvePush.configure({
-  serverUrl: 'http://localhost:8090',
+  // Android emulators reach the host machine via 10.0.2.2, not localhost.
+  serverUrl: Platform.OS === 'android' ? 'http://10.0.2.2:8090' : 'http://localhost:8090',
   channel: 'staging',
   runtimeVersion: '1.0.0',
   platform: Platform.OS === 'ios' ? 'ios' : 'android',
