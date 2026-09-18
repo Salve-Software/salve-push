@@ -19,24 +19,31 @@ import {
 import SalvePush, { type UpdateInfo } from 'react-native-salve-push';
 
 SalvePush.configure({
-  serverUrl: 'http://localhost:8080',
+  serverUrl: 'http://localhost:8090',
   channel: 'staging',
   runtimeVersion: '1.0.0',
   platform: Platform.OS === 'ios' ? 'ios' : 'android',
-  signingPublicKey: 'demo-public-key-placeholder',
+  signingPublicKey: '7/9cDOa8xLMnF+8ntvtDQ/XpLB6R6cxa8lQTo6tqaPI=',
 });
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [status, setStatus] = useState('idle');
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [currentReleaseId, setCurrentReleaseId] = useState('');
+
+  const refreshCurrentReleaseId = async () => {
+    setCurrentReleaseId(await SalvePush.getCurrentReleaseId());
+  };
 
   useEffect(() => {
     // Confirms the currently running release booted successfully; required
     // for crash-loop rollback to release the previous release (ADR 0004).
-    SalvePush.notifyAppReady().catch((error: unknown) => {
-      setStatus(`notifyAppReady failed: ${String(error)}`);
-    });
+    SalvePush.notifyAppReady()
+      .then(refreshCurrentReleaseId)
+      .catch((error: unknown) => {
+        setStatus(`notifyAppReady failed: ${String(error)}`);
+      });
   }, []);
 
   const checkForUpdate = async () => {
@@ -54,6 +61,7 @@ function App() {
     setStatus('syncing...');
     try {
       await SalvePush.sync();
+      await refreshCurrentReleaseId();
       setStatus('synced (restart app to boot the new release)');
     } catch (error) {
       setStatus(`sync failed: ${String(error)}`);
@@ -66,6 +74,7 @@ function App() {
       <View style={styles.content}>
         <Text style={styles.title}>salve-push demo</Text>
         <Text style={styles.status}>{status}</Text>
+        <Text style={styles.status}>current release: {currentReleaseId || '(none)'}</Text>
         {update ? <Text style={styles.status}>found: {update.id}</Text> : null}
         <View style={styles.buttonRow}>
           <Button title="Check for update" onPress={checkForUpdate} />

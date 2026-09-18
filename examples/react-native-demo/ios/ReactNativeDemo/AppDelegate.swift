@@ -54,13 +54,17 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
   }
 
   override func bundleURL() -> URL? {
+    // Always call the resolver, even in DEBUG: it also processes any pending crash marker from
+    // the previous run (ADR 0004) — that must happen on every launch, not just release builds.
+    let resolvedPath = salve_push_resolve_bundle_path()
+    defer { if let resolvedPath { free(resolvedPath) } }
+
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    guard let resolvedPath = salve_push_resolve_bundle_path() else {
+    guard let resolvedPath else {
       return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
     }
-    defer { free(resolvedPath) }
     return URL(fileURLWithPath: String(cString: resolvedPath))
 #endif
   }
