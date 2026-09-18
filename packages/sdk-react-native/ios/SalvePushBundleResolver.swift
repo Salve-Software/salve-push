@@ -2,7 +2,7 @@
 import Foundation
 
 @objc(SalvePushBundleResolver)
-public class SalvePushBundleResolver: NSObject {
+public final class SalvePushBundleResolver: NSObject {
   @objc public static func resolveBundleURL(default defaultURL: URL?) -> URL? {
     guard let path = SalvePushStorage.resolveBundlePath() else {
       return defaultURL
