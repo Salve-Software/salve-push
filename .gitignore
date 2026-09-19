@@ -3,6 +3,8 @@ dist/
 build/
 *.log
 .cxx/
+.build/
+.harness/
 
 
 # generated protocol types (run `pnpm protocol:generate`)

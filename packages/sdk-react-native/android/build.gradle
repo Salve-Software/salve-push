@@ -112,9 +112,20 @@ android {
     sourceCompatibility JavaVersion.VERSION_17
     targetCompatibility JavaVersion.VERSION_17
   }
+
+  testOptions {
+    unitTests.returnDefaultValues = true
+  }
 }
 
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
+
+  testImplementation "junit:junit:4.13.2"
+  testImplementation "org.mockito.kotlin:mockito-kotlin:5.2.1"
+  // Android's mockable android.jar stubs org.json.JSONObject to throw on every call in plain JVM
+  // unit tests; depend on the real implementation so SalvePushState's (de)serialization works.
+  testImplementation "org.json:json:20231013"
 }
+

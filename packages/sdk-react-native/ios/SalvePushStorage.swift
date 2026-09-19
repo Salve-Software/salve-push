@@ -2,7 +2,12 @@
 import Foundation
 
 enum SalvePushStorage {
+  /// Test-only seam: XCTest sets this to a scratch directory so tests never touch the real
+  /// Application Support directory. `nil` (the production default) uses the real one.
+  static var baseDirectoryOverride: URL?
+
   static func baseDirectory() -> URL {
+    if let baseDirectoryOverride { return baseDirectoryOverride }
     let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     let dir = appSupport.appendingPathComponent("salve-push", isDirectory: true)
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

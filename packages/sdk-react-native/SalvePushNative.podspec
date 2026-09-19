@@ -18,6 +18,7 @@ Pod::Spec.new do |s|
     "ios/**/*.{h,m,mm}",
     "cpp/**/*.{h,hpp,cpp}",
   ]
+  s.exclude_files = "ios/Tests/**/*"
 
   s.public_header_files = "ios/SalvePushCrashHandlerBridge.h"
 
