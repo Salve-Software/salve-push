@@ -121,7 +121,7 @@ jobs:
       # Keep @v… in sync with the react-native-harness version in examples/react-native-demo/package.json
       - uses: callstackincubator/react-native-harness@v1.5.0
         with:
-          app: examples/react-native-demo/android/app/build/outputs/apk/debug/app-debug.apk
+          app: android/app/build/outputs/apk/debug/app-debug.apk
           runner: android
           packageManager: pnpm
           cacheAvd: true
@@ -150,6 +150,6 @@ jobs:
       # Keep @v… in sync with the react-native-harness version in examples/react-native-demo/package.json
       - uses: callstackincubator/react-native-harness@v1.5.0
         with:
-          app: examples/react-native-demo/ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
+          app: ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
           runner: ios
           projectRoot: examples/react-native-demo
