@@ -1,6 +1,7 @@
 name: sdk
 on:
   push:
+    branches: [main]
     paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**", "examples/react-native-demo/**"]
   pull_request:
     paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**", "examples/react-native-demo/**"]
@@ -29,10 +30,16 @@ jobs:
       - name: Swift unit tests (SalvePushStorage, pure Foundation - no simulator needed)
         working-directory: packages/sdk-react-native
         run: swift test
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+      - run: pnpm install --frozen-lockfile
       - name: Kotlin unit tests (SalvePushStorage)
         working-directory: examples/react-native-demo/android
         run: ./gradlew :react-native-salve-push:testDebugUnitTest --console=plain
@@ -118,6 +125,7 @@ jobs:
           runner: android
           packageManager: pnpm
           cacheAvd: true
+          projectRoot: examples/react-native-demo
           preRunHook: |
             adb shell settings put global window_animation_scale 0
             adb shell settings put global transition_animation_scale 0
@@ -144,3 +152,4 @@ jobs:
         with:
           app: examples/react-native-demo/ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
           runner: ios
+          projectRoot: examples/react-native-demo
