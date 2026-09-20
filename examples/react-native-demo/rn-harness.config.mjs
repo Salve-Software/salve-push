@@ -29,7 +29,10 @@ const config = {
     }),
     applePlatform({
       name: 'ios',
-      device: appleSimulator('iPhone 17', '26.5'),
+      // Overridable via env: this dev machine only has iOS 26.5 installed, while the GitHub
+      // Actions macos-15 runner's default Xcode (16.4) only ships iOS 18.5/iPhone 16 - see
+      // .github/workflows/sdk.yml's harness-ios job for the CI values.
+      device: appleSimulator(process.env.HARNESS_IOS_DEVICE ?? 'iPhone 17', process.env.HARNESS_IOS_RUNTIME ?? '26.5'),
       bundleId: 'org.reactjs.native.example.ReactNativeDemo',
     }),
   ],

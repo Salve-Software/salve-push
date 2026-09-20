@@ -133,6 +133,12 @@ jobs:
   harness-ios:
     runs-on: macos-15
     needs: ios
+    env:
+      # This runner's default Xcode (16.4) only ships iOS 18.5 simulators, whose newest device
+      # is iPhone 16 - iPhone 17 requires Xcode 26.x, not selected by default. See
+      # examples/react-native-demo/rn-harness.config.mjs for the local-dev default.
+      HARNESS_IOS_DEVICE: "iPhone 16"
+      HARNESS_IOS_RUNTIME: "18.5"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
