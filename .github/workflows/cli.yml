@@ -1,6 +1,7 @@
 name: cli
 on:
   push:
+    branches: [main]
     paths: ["packages/cli/**", "packages/protocol/**", "protocol/**"]
   pull_request:
     paths: ["packages/cli/**", "packages/protocol/**", "protocol/**"]

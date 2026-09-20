@@ -1,7 +1,7 @@
 // Canonical release signing (ADR 0003): amarra bundle_hash ao metadata do release.
-// Usa hashing puro-JS (@noble/hashes) em vez de WebCrypto: precisa rodar
-// idêntico em Node (CLI) e Hermes/React Native (SDK), e Hermes não expõe
-// globalThis.crypto.subtle sem polyfill.
+// Usa hashing puro-JS (@noble/hashes) em vez de WebCrypto, e atob/btoa em vez de Buffer:
+// precisa rodar idêntico em Node (CLI) e Hermes/React Native (SDK). Hermes não expõe
+// globalThis.crypto.subtle nem Buffer sem polyfill, mas ambos os runtimes têm atob/btoa.
 import * as ed25519 from "@noble/ed25519";
 import { sha256 } from "@noble/hashes/sha256";
 import { sha512 } from "@noble/hashes/sha512";
@@ -21,6 +21,23 @@ export interface SigningKeyPair {
   publicKey: string;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export function canonicalReleaseMessage(input: ReleaseSigningInput): string {
   return [input.bundleHash, input.version, input.platform, input.channel, input.runtimeVersion].join("\n");
 }
@@ -33,16 +50,16 @@ export async function generateSigningKeyPair(): Promise<SigningKeyPair> {
   const privateKey = ed25519.utils.randomPrivateKey();
   const publicKey = ed25519.getPublicKey(privateKey);
   return {
-    privateKey: Buffer.from(privateKey).toString("base64"),
-    publicKey: Buffer.from(publicKey).toString("base64"),
+    privateKey: bytesToBase64(privateKey),
+    publicKey: bytesToBase64(publicKey),
   };
 }
 
 export async function signRelease(privateKeyBase64: string, input: ReleaseSigningInput): Promise<string> {
-  const privateKey = Buffer.from(privateKeyBase64, "base64");
+  const privateKey = base64ToBytes(privateKeyBase64);
   const message = new TextEncoder().encode(canonicalReleaseMessage(input));
   const signature = ed25519.sign(message, privateKey);
-  return Buffer.from(signature).toString("base64");
+  return bytesToBase64(signature);
 }
 
 export async function verifyRelease(
@@ -51,8 +68,8 @@ export async function verifyRelease(
   signatureBase64: string
 ): Promise<boolean> {
   try {
-    const publicKey = Buffer.from(publicKeyBase64, "base64");
-    const signature = Buffer.from(signatureBase64, "base64");
+    const publicKey = base64ToBytes(publicKeyBase64);
+    const signature = base64ToBytes(signatureBase64);
     const message = new TextEncoder().encode(canonicalReleaseMessage(input));
     return ed25519.verify(signature, message, publicKey);
   } catch {

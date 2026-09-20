@@ -1,0 +1,24 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["salvepush"],
+  "ios": {
+    "iosModuleName": "SalvePushNative"
+  },
+  "android": {
+    "androidNamespace": ["salvepush"],
+    "androidCxxLibName": "salvepush"
+  },
+  "autolinking": {
+    "SalvePushNative": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridSalvePushNative"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridSalvePushNative"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

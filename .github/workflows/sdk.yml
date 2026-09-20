@@ -1,9 +1,10 @@
 name: sdk
 on:
   push:
-    paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**"]
+    branches: [main]
+    paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**", "examples/react-native-demo/**"]
   pull_request:
-    paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**"]
+    paths: ["packages/sdk-react-native/**", "packages/protocol/**", "protocol/**", "examples/react-native-demo/**"]
 
 jobs:
   build:
@@ -19,3 +20,142 @@ jobs:
       - run: pnpm protocol:generate
       - run: pnpm --filter @salve-push/protocol... --filter react-native-salve-push build
       - run: pnpm --filter react-native-salve-push lint
+      - run: pnpm --filter react-native-salve-push test
+
+  native-unit-tests:
+    runs-on: macos-15
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift unit tests (SalvePushStorage, pure Foundation - no simulator needed)
+        working-directory: packages/sdk-react-native
+        run: swift test
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pnpm install --frozen-lockfile
+      - name: Kotlin unit tests (SalvePushStorage)
+        working-directory: examples/react-native-demo/android
+        run: ./gradlew :react-native-salve-push:testDebugUnitTest --console=plain
+
+  android:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
+      - run: pnpm --filter @salve-push/protocol... --filter react-native-salve-push build
+      - name: Build example app (Android debug)
+        working-directory: examples/react-native-demo/android
+        run: ./gradlew :app:assembleDebug --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: examples/react-native-demo/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
+
+  ios:
+    runs-on: macos-15
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
+      - run: pnpm --filter @salve-push/protocol... --filter react-native-salve-push build
+      - name: pod install
+        working-directory: examples/react-native-demo/ios
+        run: pod install
+      - name: Build example app (iOS simulator, Debug)
+        working-directory: examples/react-native-demo/ios
+        run: |
+          xcodebuild -workspace ReactNativeDemo.xcworkspace -scheme ReactNativeDemo \
+            -configuration Debug -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-debug-app
+          path: examples/react-native-demo/ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
+          retention-days: 1
+
+  # react-native-harness E2E: exercises the real Nitro HybridObject (native install/storage) on a
+  # real simulator/emulator, not a build-only smoke test. See __tests__/salve-push.harness.ts.
+  harness-android:
+    runs-on: ubuntu-latest
+    needs: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
+      - run: pnpm --filter @salve-push/protocol... --filter react-native-salve-push build
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-debug-apk
+          path: examples/react-native-demo/android/app/build/outputs/apk/debug
+      # Keep @v… in sync with the react-native-harness version in examples/react-native-demo/package.json
+      - uses: callstackincubator/react-native-harness@v1.5.0
+        with:
+          app: android/app/build/outputs/apk/debug/app-debug.apk
+          runner: android
+          packageManager: pnpm
+          cacheAvd: true
+          projectRoot: examples/react-native-demo
+          preRunHook: |
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+
+  harness-ios:
+    runs-on: macos-15
+    needs: ios
+    env:
+      # This runner's default Xcode (16.4) only ships iOS 18.5 simulators, whose newest device
+      # is iPhone 16 - iPhone 17 requires Xcode 26.x, not selected by default. See
+      # examples/react-native-demo/rn-harness.config.mjs for the local-dev default.
+      HARNESS_IOS_DEVICE: "iPhone 16"
+      HARNESS_IOS_RUNTIME: "18.5"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm protocol:generate
+      - run: pnpm --filter @salve-push/protocol... --filter react-native-salve-push build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-debug-app
+          path: examples/react-native-demo/ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
+      # Keep @v… in sync with the react-native-harness version in examples/react-native-demo/package.json
+      - uses: callstackincubator/react-native-harness@v1.5.0
+        with:
+          app: ios/build/Build/Products/Debug-iphonesimulator/ReactNativeDemo.app
+          runner: ios
+          projectRoot: examples/react-native-demo
